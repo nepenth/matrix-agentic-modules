@@ -1,15 +1,6 @@
-# Installation & Configuration
+# Installation (v0.2)
 
-## Prerequisites
-- Synapse >= 1.100
-- Python 3.10+
-
-## Steps
-
-1. Clone or copy this package into your Synapse environment
-   (or `pip install -e .` after adding to PYTHONPATH)
-
-2. Add to your `homeserver.yaml`:
+## 1. Add the module
 
 ```yaml
 modules:
@@ -17,16 +8,18 @@ modules:
     config:
       agent_user_prefix: "agent_"
       require_approval_for_tools: true
+      approval_reaction: "✅"
 ```
 
-3. Restart Synapse.
+## 2. Restart Synapse
 
-## Testing
-Create an agent account (@agent_grok:your.domain) and send messages containing "tool_call".
+## 3. Test with an agent
 
-Check logs for [AgentFirst] messages.
+Send a message containing "tool_call" from @agent_xxx:yourserver
 
-## Next Steps
-- Implement full approval state machine
-- Add extra_fields callback for rich client metadata
-- Add custom web resource for external AI triggers
+Watch logs and check event `unsigned` fields in clients that support it (or via `/sync`).
+
+## Recommended Clients
+- Hermes Agent (your PRs)
+- Custom Element fork with agent UI components
+- Any client that reads `unsigned.agent_metadata`
