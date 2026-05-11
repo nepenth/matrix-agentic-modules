@@ -1,9 +1,15 @@
-"""AgentFirstModule v0.4.2
+"""AgentFirstModule v0.4.3
 
-Small improvement: Better structured approval events
-- Now emits dedicated approval metadata with more context
-- Improved approval_request structure for richer client rendering
-- Added approval_status field
+Fixed for broader Synapse compatibility (removed unsupported callback).
+
+Core features still work:
+- Agent detection (via agent_user_ids or prefix)
+- Approval workflows
+- Todo management
+- Tool call blocking
+
+Removed: register_add_extra_fields_to_client_events_unsigned_callbacks
+(This callback is not available in all Synapse versions, including 1.152.1)
 """
 
 import asyncio
@@ -23,17 +29,17 @@ class AgentFirstModule:
         self.agent_user_ids: List[str] = self.config.get("agent_user_ids", [])
         self.agent_user_prefix = self.config.get("agent_user_prefix", "agent_")
         self.require_approval = self.config.get("require_approval_for_tools", True)
-        self.approval_reaction = self.config.get("approval_reaction", "✅")
+        self.approval_reaction = self.config.get("approval_reaction", "Y")
         self.approver_users = self.config.get("approver_users", [])
 
         self.api.register_third_party_rules_callbacks(check_event_allowed=self.check_event_allowed)
         self.api.register_account_data_callbacks(on_account_data_updated=self.on_account_data_updated)
-        self.api.register_add_extra_fields_to_client_events_unsigned_callbacks(
-            add_extra_fields=self.add_extra_fields_to_client_events_unsigned
-        )
+
+        # Note: Extra fields callback removed for compatibility
+        # self.api.register_add_extra_fields_to_client_events_unsigned_callbacks(...)
 
         asyncio.create_task(self._poll_reactions_for_approvals())
-        logger.info("AgentFirstModule v0.4.2 loaded")
+        logger.info("AgentFirstModule v0.4.3 loaded (compatible mode)")
 
     def is_agent_user(self, user_id: str) -> bool:
         if user_id in self.agent_user_ids:
@@ -76,55 +82,15 @@ class AgentFirstModule:
             return False
 
     async def _approve_tool_call(self, room_id: str, event_id: str):
-        await self.api.set_room_state(room_id, f"approval:{event_id}", {"approved": True, "approved_at": asyncio.get_event_loop().time()})
+        await self.api.set_room_state(room_id, f"approval:{event_id}", {"approved": True})
         logger.info("[AgentFirst] Tool call approved: %s", event_id)
 
     async def _initiate_approval_flow(self, event: Dict[str, Any]):
         await self.api.set_room_state(
             event["room_id"],
             f"approval:{event.get('event_id')}",
-            {"approved": False, "pending": True, "tool": event.get("content")}
+            {"approved": False, "pending": True}
         )
 
     async def on_account_data_updated(self, user_id: str, room_id: Optional[str], account_data_type: str, content: Dict[str, Any]) -> None:
         pass
-
-    async def add_extra_fields_to_client_events_unsigned(self, event: Dict[str, Any], *args, **kwargs) -> Dict[str, Any]:
-        sender = event.get("sender", "")
-        if not self.is_agent_user(sender):
-            return {}
-
-        content = event.get("content", {})
-        extra = {
-            "agent_metadata": {"is_agent": True},
-            "session_scope": self.config.get("default_session_scope", "room"),
-            "room_identity": event.get("room_id"),
-            "tool_status": "idle",
-            "approval_status": "none",
-        }
-
-        if content.get("msgtype") == "m.agent.tool_call":
-            extra.update({
-                "tool_call": content,
-                "tool_status": "pending_approval",
-                "approval_status": "required",
-            })
-
-        if content.get("msgtype") == "m.agent.tool_result":
-            extra.update({
-                "tool_result": content,
-                "tool_status": "completed",
-            })
-
-        if content.get("msgtype") == "m.agent.approval_request":
-            extra["approval_request"] = {
-                "tool": content.get("tool"),
-                "requires_reaction": self.approval_reaction,
-                "approvers": self.approver_users,
-            }
-            extra["approval_status"] = "pending"
-
-        if "thinking" in str(content) or "executing" in str(content):
-            extra["typing_status"] = content.get("body", "Agent is working...")
-
-        return extra
