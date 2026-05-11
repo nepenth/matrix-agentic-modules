@@ -1,0 +1,4 @@
+[project]
+name = "matrix-agentic-modules"
+version = "0.1.0"
+description = "Synapse modules for agentic Matrix servers"
