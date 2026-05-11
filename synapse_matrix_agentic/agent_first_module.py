@@ -1,8 +1,9 @@
-"""AgentFirstModule v0.4.1
+"""AgentFirstModule v0.4.2
 
-- Added support for explicit agent_user_ids list (fixes issue with non-@agent_* naming)
-- Improved agent detection flexibility
-- Updated for professional README
+Small improvement: Better structured approval events
+- Now emits dedicated approval metadata with more context
+- Improved approval_request structure for richer client rendering
+- Added approval_status field
 """
 
 import asyncio
@@ -19,10 +20,8 @@ class AgentFirstModule:
         self.api = api
         self.config = config or {}
 
-        # Flexible agent detection
         self.agent_user_ids: List[str] = self.config.get("agent_user_ids", [])
         self.agent_user_prefix = self.config.get("agent_user_prefix", "agent_")
-
         self.require_approval = self.config.get("require_approval_for_tools", True)
         self.approval_reaction = self.config.get("approval_reaction", "✅")
         self.approver_users = self.config.get("approver_users", [])
@@ -34,7 +33,7 @@ class AgentFirstModule:
         )
 
         asyncio.create_task(self._poll_reactions_for_approvals())
-        logger.info("AgentFirstModule v0.4.1 loaded with flexible agent detection")
+        logger.info("AgentFirstModule v0.4.2 loaded")
 
     def is_agent_user(self, user_id: str) -> bool:
         if user_id in self.agent_user_ids:
@@ -42,8 +41,6 @@ class AgentFirstModule:
         if user_id.startswith("@" + self.agent_user_prefix):
             return True
         return False
-
-    # ... (rest of methods remain the same as v0.4)
 
     async def _poll_reactions_for_approvals(self):
         while True:
@@ -79,14 +76,14 @@ class AgentFirstModule:
             return False
 
     async def _approve_tool_call(self, room_id: str, event_id: str):
-        await self.api.set_room_state(room_id, f"approval:{event_id}", {"approved": True})
-        logger.info("[AgentFirst] Tool call approved via reaction: %s", event_id)
+        await self.api.set_room_state(room_id, f"approval:{event_id}", {"approved": True, "approved_at": asyncio.get_event_loop().time()})
+        logger.info("[AgentFirst] Tool call approved: %s", event_id)
 
     async def _initiate_approval_flow(self, event: Dict[str, Any]):
         await self.api.set_room_state(
             event["room_id"],
             f"approval:{event.get('event_id')}",
-            {"approved": False, "pending": True}
+            {"approved": False, "pending": True, "tool": event.get("content")}
         )
 
     async def on_account_data_updated(self, user_id: str, room_id: Optional[str], account_data_type: str, content: Dict[str, Any]) -> None:
@@ -103,18 +100,29 @@ class AgentFirstModule:
             "session_scope": self.config.get("default_session_scope", "room"),
             "room_identity": event.get("room_id"),
             "tool_status": "idle",
+            "approval_status": "none",
         }
 
         if content.get("msgtype") == "m.agent.tool_call":
-            extra["tool_call"] = content
-            extra["tool_status"] = "pending_approval"
+            extra.update({
+                "tool_call": content,
+                "tool_status": "pending_approval",
+                "approval_status": "required",
+            })
 
         if content.get("msgtype") == "m.agent.tool_result":
-            extra["tool_result"] = content
-            extra["tool_status"] = "completed"
+            extra.update({
+                "tool_result": content,
+                "tool_status": "completed",
+            })
 
         if content.get("msgtype") == "m.agent.approval_request":
-            extra["approval_request"] = content
+            extra["approval_request"] = {
+                "tool": content.get("tool"),
+                "requires_reaction": self.approval_reaction,
+                "approvers": self.approver_users,
+            }
+            extra["approval_status"] = "pending"
 
         if "thinking" in str(content) or "executing" in str(content):
             extra["typing_status"] = content.get("body", "Agent is working...")
