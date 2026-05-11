@@ -1,18 +1,18 @@
-"""AgentFirstModule v0.4.3
+"""AgentFirstModule v0.4.5
 
-Fixed for broader Synapse compatibility (removed unsupported callback).
+Final compatibility fix:
+- Removed asyncio.create_task (caused 'no running event loop' error)
+- Removed unsupported extra fields callback
 
-Core features still work:
-- Agent detection (via agent_user_ids or prefix)
-- Approval workflows
+This version should work on Synapse 1.152.1 and most recent versions.
+
+Core features:
+- Agent detection
+- Approval workflows (reaction + DM prompts)
 - Todo management
 - Tool call blocking
-
-Removed: register_add_extra_fields_to_client_events_unsigned_callbacks
-(This callback is not available in all Synapse versions, including 1.152.1)
 """
 
-import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -35,11 +35,7 @@ class AgentFirstModule:
         self.api.register_third_party_rules_callbacks(check_event_allowed=self.check_event_allowed)
         self.api.register_account_data_callbacks(on_account_data_updated=self.on_account_data_updated)
 
-        # Note: Extra fields callback removed for compatibility
-        # self.api.register_add_extra_fields_to_client_events_unsigned_callbacks(...)
-
-        asyncio.create_task(self._poll_reactions_for_approvals())
-        logger.info("AgentFirstModule v0.4.3 loaded (compatible mode)")
+        logger.info("AgentFirstModule v0.4.5 loaded successfully")
 
     def is_agent_user(self, user_id: str) -> bool:
         if user_id in self.agent_user_ids:
@@ -47,10 +43,6 @@ class AgentFirstModule:
         if user_id.startswith("@" + self.agent_user_prefix):
             return True
         return False
-
-    async def _poll_reactions_for_approvals(self):
-        while True:
-            await asyncio.sleep(5)
 
     async def check_event_allowed(self, event: Dict[str, Any], state: Dict[str, Any]) -> Optional[str]:
         sender = event.get("sender", "")
