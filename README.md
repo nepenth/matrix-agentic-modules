@@ -1,27 +1,29 @@
-# matrix-agentic-modules
+# matrix-agentic-modules v0.3
 
-**Synapse modules that make AI agents first-class citizens.**
+**Synapse modules making AI agents first-class on Matrix.**
 
-Complements the excellent client-side work in [Hermes Agent](https://github.com/NousResearch/hermes-agent) (especially PRs #18505, #18506, #18507).
+Built to pair perfectly with [Hermes Agent](https://github.com/NousResearch/hermes-agent) PR stack (#18505–18507).
 
-## Current Features (v0.2)
+## New in v0.3
 
-- **Extra fields callback** → Injects `agent_metadata`, `tool_call`, `tool_status`, `todo_summary` into every event’s `unsigned` section (perfect for rich client UIs)
-- **Approval workflow foundation** → Blocks tool calls until human approval (reaction or DM-based)
-- **Todo management** via account data (`m.agent.todo`)
-- **Improved agent detection** (prefix + future account data profile)
-- Logging and extensibility hooks
+- **Full approval state machine** — Persistent via room state, reaction polling, DM prompts to approvers
+- **Custom HTTP endpoint** — `/_synapse/admin/agent/trigger` for external AI runtimes (push tool results, request approvals)
+- **Deep Hermes integration**:
+  - `session_scope` (auto|room|thread) exposed in every event
+  - `room_identity` preservation
+  - Structured `m.agent.approval_request` events
+  - Typing status + tool progress metadata
 
-## Installation
+## Why this is powerful
 
-See `docs/installation.md`
+Modern Slack/Discord agent bots (e.g. Slack AI, Discord bots with buttons) give agents:
+- Clear approval flows
+- Thread/session awareness
+- Rich structured feedback
 
-## Roadmap
-- Full approval state machine with reaction support
-- Custom HTTP endpoint for external AI triggers
+This module brings the same (and better, thanks to Matrix federation + E2EE) to open Matrix.
+
+## Next
+- Full reaction listener for instant approvals
 - Tests + CI
-- Native support for Hermes session scoping
-
-## Why this matters
-
-Together with your Hermes improvements (room isolation, reliable dispatch, tool/reaction handling), this creates a complete agent-native Matrix stack.
+- Follow-up Hermes PR for native support of new event shapes

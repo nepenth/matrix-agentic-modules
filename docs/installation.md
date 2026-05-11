@@ -1,6 +1,4 @@
-# Installation (v0.2)
-
-## 1. Add the module
+# v0.3 Installation
 
 ```yaml
 modules:
@@ -8,18 +6,9 @@ modules:
     config:
       agent_user_prefix: "agent_"
       require_approval_for_tools: true
-      approval_reaction: "✅"
+      approver_users:
+        - "@admin:yourserver.com"
+      default_session_scope: "room"
 ```
 
-## 2. Restart Synapse
-
-## 3. Test with an agent
-
-Send a message containing "tool_call" from @agent_xxx:yourserver
-
-Watch logs and check event `unsigned` fields in clients that support it (or via `/sync`).
-
-## Recommended Clients
-- Hermes Agent (your PRs)
-- Custom Element fork with agent UI components
-- Any client that reads `unsigned.agent_metadata`
+**New endpoint:** POST `/_synapse/admin/agent/trigger` (for external triggers from Hermes or other AI systems).
